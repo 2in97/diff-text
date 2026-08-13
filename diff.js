@@ -173,17 +173,17 @@
         return { leftHtml: build(a, aMarks, 'cd-del'), rightHtml: build(b, bMarks, 'cd-ins') };
     }
 
-    // 为 modify 句子对生成 inline 高亮 HTML
-    // left[i] <-> right[i] 一一对应（多出的挂在末尾）
+    // 为 modify 句子对生成整句高亮 HTML（修订模式）
+    // 左侧整句删除线，右侧整句下划线
     function pairInlineHtml(leftArr, rightArr) {
         const max = Math.max(leftArr.length, rightArr.length);
         const leftHtmls = [], rightHtmls = [];
         for (let k = 0; k < max; k++) {
             const l = leftArr[k], r = rightArr[k];
             if (l !== undefined && r !== undefined) {
-                const h = charDiff(l, r);
-                leftHtmls.push(h.leftHtml);
-                rightHtmls.push(h.rightHtml);
+                // 整句标记为不同版本
+                leftHtmls.push('<span class="cd-del">' + escapeHtml(l) + '</span>');
+                rightHtmls.push('<span class="cd-ins">' + escapeHtml(r) + '</span>');
             } else if (l !== undefined) {
                 leftHtmls.push('<span class="cd-del">' + escapeHtml(l) + '</span>');
             } else {

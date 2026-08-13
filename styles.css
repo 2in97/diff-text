@@ -270,29 +270,33 @@ body {
 .row-del .line-content { color: var(--del-text); }
 .row-mod .line-content { color: var(--mod-text); }
 
-/* 字符级 inline diff 高亮（VSCode 风格） */
-.line-content .cd-del {
-    background: rgba(244, 135, 113, 0.45);
-    color: #ffb4a8;
+/* 字符级 inline diff 高亮（修订模式风格） */
+/* 左侧：删除线表示"被删除的旧版本" */
+.diff-pane-left .line-content .cd-del {
+    background: rgba(244, 135, 113, 0.30);
+    color: #f48771;
     text-decoration: line-through;
     text-decoration-color: rgba(244, 135, 113, 0.8);
     border-radius: 2px;
     padding: 0 1px;
 }
-.line-content .cd-ins {
-    background: rgba(78, 201, 176, 0.40);
-    color: #9ee0c8;
+
+/* 右侧：下划线表示"新增的新版本" */
+.diff-pane-right .line-content .cd-ins {
+    background: rgba(78, 201, 176, 0.25);
+    color: #73c991;
+    text-decoration: underline;
+    text-decoration-color: rgba(78, 201, 176, 0.8);
     border-radius: 2px;
     padding: 0 1px;
 }
-/* equal 行内的字符高亮用更柔和的色 */
-.row-equal .line-content .cd-del {
-    background: rgba(244, 135, 113, 0.30);
-    color: #f48771;
-}
+
+/* equal 行内不需要高亮 */
+.row-equal .line-content .cd-del,
 .row-equal .line-content .cd-ins {
-    background: rgba(78, 201, 176, 0.28);
-    color: #4ec9b0;
+    background: transparent;
+    color: inherit;
+    text-decoration: none;
 }
 
 .diff-row.row-empty {
