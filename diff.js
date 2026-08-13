@@ -34,7 +34,6 @@
 
     // ============ 状态 ============
     let pairs = [];        // 比对结果对
-    let mobileSide = 'left'; // 手机当前查看的一侧
 
     // ============ 工具函数 ============
 
@@ -754,15 +753,6 @@
     toggleViewBtn.addEventListener('click', () => {
         document.body.classList.toggle('force-mobile');
         toggleViewBtn.classList.toggle('btn-primary');
-    });
-
-    // 手机 tab 切换
-    document.querySelectorAll('.mobile-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            document.querySelectorAll('.mobile-tab').forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-            mobileSide = tab.dataset.side;
-        });
     });
 
     acceptAllLeftBtn.addEventListener('click', () => acceptAll('left'));
