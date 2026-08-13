@@ -28,6 +28,9 @@
     const acceptAllLeftBtn = $('acceptAllLeftBtn');
     const acceptAllRightBtn = $('acceptAllRightBtn');
     const toastEl = $('toast');
+    const fmtApplyBtn = $('fmtApplyBtn');
+    const fmtCopyBtn = $('fmtCopyBtn');
+    const fmtPreview = $('fmtPreview');
 
     // ============ 状态 ============
     let pairs = [];        // 比对结果对
@@ -153,19 +156,17 @@
         leftPaneBody.innerHTML = '';
         rightPaneBody.innerHTML = '';
         pairs.forEach((p, idx) => {
-            const rowType = pairRowType(p);
             const maxRows = Math.max(p.left.length, p.right.length, 1);
             const pairEl = document.createElement('div');
             pairEl.className = 'diff-pair';
             pairEl.dataset.idx = idx;
 
             for (let r = 0; r < maxRows; r++) {
-                // 左
                 const lRow = makeRow({
                     sign: p.left[r] !== undefined ? leftSign(p) : '',
                     content: p.left[r] !== undefined ? p.left[r] : '',
                     no: p.leftNos[r] || '',
-                    rowClass: p.left[r] !== undefined ? rowType : 'row-empty',
+                    rowClass: p.left[r] !== undefined ? leftRowClass(p) : 'row-empty',
                     empty: p.left[r] === undefined
                 });
                 pairEl.appendChild(lRow);
@@ -181,7 +182,7 @@
                     sign: p.right[r] !== undefined ? rightSign(p) : '',
                     content: p.right[r] !== undefined ? p.right[r] : '',
                     no: p.rightNos[r] || '',
-                    rowClass: p.right[r] !== undefined ? rowType : 'row-empty',
+                    rowClass: p.right[r] !== undefined ? rightRowClass(p) : 'row-empty',
                     empty: p.right[r] === undefined
                 });
                 pairElR.appendChild(rRow);
@@ -211,6 +212,18 @@
         if (p.type === 'modify') return 'row-mod';
         if (p.type === 'add') return 'row-add';
         return 'row-del';
+    }
+    // 左侧专用行样式：modify 在左侧表现为删除色
+    function leftRowClass(p) {
+        if (p.type === 'equal') return 'row-equal';
+        if (p.type === 'modify' || p.type === 'del') return 'row-del';
+        return 'row-equal';
+    }
+    // 右侧专用行样式：modify 在右侧表现为新增色
+    function rightRowClass(p) {
+        if (p.type === 'equal') return 'row-equal';
+        if (p.type === 'modify' || p.type === 'add') return 'row-add';
+        return 'row-equal';
     }
 
     function makeRow({ sign, content, no, rowClass, empty }) {
@@ -295,13 +308,12 @@
             card.dataset.idx = idx;
             card.style.cssText = 'border:1px solid var(--border);border-radius:4px;margin:6px 0;overflow:hidden;';
 
-            const rowType = pairRowType(p);
             p.left.forEach((line, r) => {
                 const row = makeRow({
                     sign: '-',
                     content: line,
                     no: p.leftNos[r] || '',
-                    rowClass: rowType === 'row-add' ? 'row-del' : rowType,
+                    rowClass: leftRowClass(p),
                     empty: false
                 });
                 card.appendChild(row);
@@ -311,7 +323,7 @@
                     sign: '+',
                     content: line,
                     no: p.rightNos[r] || '',
-                    rowClass: rowType === 'row-del' ? 'row-add' : rowType,
+                    rowClass: rightRowClass(p),
                     empty: false
                 });
                 card.appendChild(row);
@@ -404,6 +416,162 @@
         pairs.forEach((_, idx) => updatePairControlState(idx));
         renderResult();
         showToast(side === 'left' ? '已全部采用左侧' : '已全部采用右侧');
+    }
+
+    // ============ 作文排版 ============
+    /**
+     * 将文本按段落整理为作文格式
+     * 规则：
+     *   - 段落由空行分隔；若无空行，则每行视为独立段落
+     *   - 段首缩进指定字符数
+     *   - 可选：合并多余空行、中文标点修正
+     */
+    function formatEssay(text, opts) {
+        if (!text) return [];
+        // 规范换行
+        let lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+
+        // 中文标点修正：英文标点 -> 中文全角标点（仅在中文语境）
+        if (opts.fullPunct) {
+            lines = lines.map(line => fixPunctuation(line));
+        }
+
+        // 按空行分段；若无空行，则每非空行作为一段
+        let paragraphs = [];
+        let buf = [];
+        const flush = () => {
+            if (buf.length) {
+                // 合并同一段内的换行为一句连续文本，去除行首尾空白
+                paragraphs.push(buf.join('').trim());
+                buf = [];
+            }
+        };
+        let hasBlank = lines.some(l => l.trim() === '');
+        if (hasBlank) {
+            lines.forEach(l => {
+                if (l.trim() === '') flush();
+                else buf.push(l.trim());
+            });
+            flush();
+        } else {
+            lines.forEach(l => {
+                if (l.trim() !== '') paragraphs.push(l.trim());
+            });
+        }
+
+        // 去除多余空段
+        paragraphs = paragraphs.filter(p => p.length > 0);
+
+        // 应用缩进
+        if (opts.indent > 0) {
+            const indent = '\u3000'.repeat(opts.indent); // 全角空格
+            paragraphs = paragraphs.map(p => indent + p);
+        }
+
+        return paragraphs;
+    }
+
+    // 中文标点修正
+    function fixPunctuation(line) {
+        // 常见英文标点转中文全角（保留英文片段内的标点不动较复杂，这里做基础替换）
+        const map = [
+            [/,/g, '，'],
+            [/\./g, '。'],
+            [/!/g, '！'],
+            [/\?/g, '？'],
+            [/;/g, '；'],
+            [/:/g, '：'],
+            [/\(/g, '（'],
+            [/\)/g, '）'],
+            [/\[/g, '【'],
+            [/\]/g, '】'],
+        ];
+        let result = line;
+        // 仅对中文字符相邻的标点做替换，避免误伤英文数字小数点等
+        // 简化处理：若该行含中文字符，则做替换；但对小数点（数字.数字）保留
+        if (/[\u4e00-\u9fa5]/.test(result)) {
+            // 保护数字小数与英文缩写中的点
+            const decimals = [];
+            result = result.replace(/(\d)\.(\d)/g, (m) => {
+                decimals.push(m);
+                return `\u0000${decimals.length - 1}\u0000`;
+            });
+            map.forEach(([re, ch]) => {
+                if (ch === '。') {
+                    // 句号：仅替换末尾或中文后的点
+                    result = result.replace(/([\u4e00-\u9fa5])\./g, '$1。');
+                    result = result.replace(/\.$/, '。');
+                } else {
+                    result = result.replace(re, (m, off) => {
+                        // 替换前后是中文/全角则替换，否则保留
+                        const before = result[off - 1] || '';
+                        const after = result[off + 1] || '';
+                        if (/[\u4e00-\u9fa5]/.test(before) || /[\u4e00-\u9fa5]/.test(after)) return ch;
+                        return m;
+                    });
+                }
+            });
+            // 还原小数点
+            result = result.replace(/\u0000(\d+)\u0000/g, (m, i) => decimals[+i]);
+        }
+        return result;
+    }
+
+    function applyFormat() {
+        const src = resultOutput.textContent || '';
+        if (!src.trim()) {
+            showToast('请先进行比对，生成合并结果');
+            return;
+        }
+        const opts = {
+            fontSize: parseInt($('fmtFontSize').value, 10) || 16,
+            lineHeight: parseFloat($('fmtLineHeight').value) || 1.75,
+            paraGap: parseInt($('fmtParaGap').value, 10) || 0,
+            indent: parseInt($('fmtIndent').value, 10) || 0,
+            trim: $('fmtTrim').checked,
+            fullPunct: $('fmtFullPunct').checked,
+            align: $('fmtAlign').checked
+        };
+        let paragraphs = formatEssay(src, opts);
+        if (opts.trim) {
+            // 已在 formatEssay 中过滤空段
+        }
+
+        // 渲染预览
+        fmtPreview.innerHTML = '';
+        fmtPreview.classList.toggle('fmt-empty', paragraphs.length === 0);
+        fmtPreview.style.fontSize = opts.fontSize + 'px';
+        fmtPreview.style.lineHeight = String(opts.lineHeight);
+        fmtPreview.style.textAlign = opts.align ? 'justify' : 'left';
+        paragraphs.forEach(p => {
+            const div = document.createElement('p');
+            div.className = 'fmt-para';
+            div.style.marginBottom = opts.paraGap + 'px';
+            div.textContent = p;
+            fmtPreview.appendChild(div);
+        });
+        fmtPreview._paragraphs = paragraphs;
+        showToast('已应用排版');
+    }
+
+    function copyFormatted() {
+        const paras = fmtPreview._paragraphs;
+        if (!paras || !paras.length) {
+            showToast('请先点击「应用排版」');
+            return;
+        }
+        const text = paras.join('\n\n');
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+            document.execCommand('copy');
+            showToast('已复制排版文本');
+        } catch (_) {
+            showToast('复制失败，请手动选择');
+        }
+        document.body.removeChild(ta);
     }
 
     // ============ 事件绑定 ============
@@ -519,4 +687,8 @@
             compare();
         }
     });
+
+    // 作文排版
+    fmtApplyBtn.addEventListener('click', applyFormat);
+    fmtCopyBtn.addEventListener('click', copyFormatted);
 })();

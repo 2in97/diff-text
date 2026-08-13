@@ -14,12 +14,14 @@
     --accent: #0e639c;
     --accent-hover: #1177bb;
     --add-bg: #1b3a1f;
-    --add-text: #4ec9b0;
-    --add-line-bg: rgba(78, 201, 176, 0.12);
+    --add-text: #73c991;
+    --add-line-bg: rgba(78, 201, 176, 0.28);
     --del-bg: #4a1f1f;
     --del-text: #f48771;
-    --del-line-bg: rgba(244, 135, 113, 0.12);
+    --del-line-bg: rgba(244, 135, 113, 0.28);
     --mod-bg: #3a341b;
+    --mod-line-bg: rgba(204, 178, 80, 0.28);
+    --mod-text: #dcdcaa;
     --hover-bg: #2a2d2e;
     --header-bg: #2d2d2d;
 }
@@ -250,8 +252,23 @@ body {
 }
 
 .diff-row.row-mod {
-    background: rgba(220, 220, 170, 0.08);
+    background: var(--mod-line-bg);
 }
+
+/* 增强差异行的左边框（VSCode 风格色条） */
+.diff-row.row-add .line-gutter {
+    border-right-color: var(--add-text);
+}
+.diff-row.row-del .line-gutter {
+    border-right-color: var(--del-text);
+}
+.diff-row.row-mod .line-gutter {
+    border-right-color: var(--mod-text);
+}
+
+.row-add .line-content { color: var(--add-text); }
+.row-del .line-content { color: var(--del-text); }
+.row-mod .line-content { color: var(--mod-text); }
 
 .diff-row.row-empty {
     background: rgba(255, 255, 255, 0.02);
@@ -429,6 +446,92 @@ body {
     position: absolute;
     top: 16px;
     right: 16px;
+}
+
+/* 作文排版区 */
+.format-section .format-wrap {
+    padding: 12px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.format-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 16px;
+    align-items: center;
+}
+
+.fc-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.fc-item select {
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 3px 6px;
+    font-size: 12px;
+    font-family: inherit;
+    outline: none;
+}
+
+.fc-item select:focus {
+    border-color: var(--accent);
+}
+
+.fc-check {
+    cursor: pointer;
+    color: var(--text);
+}
+
+.fc-check input {
+    cursor: pointer;
+    accent-color: var(--accent);
+}
+
+.format-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.format-hint {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.fmt-preview {
+    background: #fff;
+    color: #000;
+    padding: 32px 40px;
+    border-radius: 4px;
+    max-height: 520px;
+    overflow-y: auto;
+    font-family: "PingFang SC", "Microsoft YaHei", "SimSun", "宋体", serif;
+    line-height: 1.75;
+    white-space: pre-wrap;
+    word-break: break-word;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.fmt-preview .fmt-para {
+    margin: 0;
+    padding: 0;
+}
+
+.fmt-preview.fmt-empty::before {
+    content: '点击「应用排版」预览作文格式';
+    color: #999;
+    font-size: 13px;
 }
 
 /* Toast */

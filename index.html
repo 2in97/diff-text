@@ -76,6 +76,68 @@
                     <button id="copyResultBtn" class="btn btn-mini btn-primary">复制</button>
                 </div>
             </details>
+
+            <details class="result-section format-section">
+                <summary>作文排版（点击展开）</summary>
+                <div class="format-wrap">
+                    <div class="format-controls">
+                        <label class="fc-item">
+                            <span>字号</span>
+                            <select id="fmtFontSize">
+                                <option value="14">小四 14px</option>
+                                <option value="16" selected>14pt</option>
+                                <option value="18">小三 18px</option>
+                                <option value="20">三号 20px</option>
+                                <option value="24">小二 24px</option>
+                            </select>
+                        </label>
+                        <label class="fc-item">
+                            <span>行距</span>
+                            <select id="fmtLineHeight">
+                                <option value="1.5">1.5 倍</option>
+                                <option value="1.75" selected>1.75 倍</option>
+                                <option value="2">2 倍</option>
+                                <option value="2.5">2.5 倍</option>
+                            </select>
+                        </label>
+                        <label class="fc-item">
+                            <span>段间距</span>
+                            <select id="fmtParaGap">
+                                <option value="0">无</option>
+                                <option value="8">8px</option>
+                                <option value="16" selected>16px</option>
+                                <option value="24">24px</option>
+                            </select>
+                        </label>
+                        <label class="fc-item">
+                            <span>段首缩进</span>
+                            <select id="fmtIndent">
+                                <option value="0">无</option>
+                                <option value="2" selected>2 字符</option>
+                                <option value="4">4 字符</option>
+                            </select>
+                        </label>
+                        <label class="fc-item fc-check">
+                            <input type="checkbox" id="fmtTrim" checked>
+                            <span>去除多余空行</span>
+                        </label>
+                        <label class="fc-item fc-check">
+                            <input type="checkbox" id="fmtFullPunct" checked>
+                            <span>中文标点修正</span>
+                        </label>
+                        <label class="fc-item fc-check">
+                            <input type="checkbox" id="fmtAlign">
+                            <span>两端对齐</span>
+                        </label>
+                    </div>
+                    <div class="format-actions">
+                        <button id="fmtApplyBtn" class="btn btn-mini btn-primary">应用排版</button>
+                        <button id="fmtCopyBtn" class="btn btn-mini">复制排版文本</button>
+                        <span class="format-hint">源文本取自合并结果</span>
+                    </div>
+                    <div id="fmtPreview" class="fmt-preview"></div>
+                </div>
+            </details>
         </section>
     </div>
 
