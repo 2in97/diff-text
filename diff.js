@@ -37,13 +37,37 @@
     let mobileSide = 'left'; // 手机当前查看的一侧
 
     // ============ 工具函数 ============
-    function splitLines(text) {
+
+    /**
+     * 把文本切分为「句子」单元（用于中文作文级 diff）
+     * 规则：以中文句末标点（。！？）及换行作为切分点，保留标点与缩进。
+     * 空行保留为独立的段落分隔单元。
+     */
+    function splitSentences(text) {
         if (text === '') return [];
-        // 保留 \r\n 与 \n 处理，统一去掉 \r
         const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-        const lines = normalized.split('\n');
-        // 若文本以换行结尾，最后一个空串无意义，保留即可（与编辑器一致）
-        return lines;
+        if (normalized === '') return [];
+        // 用正则切分：保留分隔符。分隔符 = 句末标点（含多个）或 换行
+        // 例：'你好。世界！' -> ['你好', '。', '世界', '！', '']
+        const parts = normalized.split(/([。！？\n]+)/);
+        const tokens = [];
+        let buf = '';
+        for (let k = 0; k < parts.length; k++) {
+            const part = parts[k];
+            if (part === '') continue;
+            if (/^[。！？\n]+$/.test(part)) {
+                // 分隔符：合并到当前 buffer 末尾作为一个句子
+                buf += part;
+                tokens.push(buf);
+                buf = '';
+            } else {
+                buf += part;
+            }
+        }
+        if (buf !== '') tokens.push(buf);
+        // 合并纯换行的 token：连续换行保留为段落分隔（一个 '\n' token）
+        // 但为了行号与对齐，单独的换行 token 也参与 diff
+        return tokens;
     }
 
     function escapeHtml(s) {
@@ -60,12 +84,12 @@
         showToast._t = setTimeout(() => { toastEl.hidden = true; }, 1800);
     }
 
-    // ============ Diff 算法（LCS）============
+    // ============ 通用 LCS diff（对任意 token 数组）============
     /**
-     * 计算两段行数组的 diff 操作序列
+     * 通用 LCS diff，a、b 为任意字符串数组（行/句子/词）。
      * @returns {Array<{type:'equal'|'del'|'add', value:string}>}
      */
-    function diffLines(a, b) {
+    function diffTokens(a, b) {
         const m = a.length, n = b.length;
         // dp[i][j] = a[i..] 与 b[j..] 的 LCS 长度
         const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
@@ -93,6 +117,84 @@
         while (j < n) { ops.push({ type: 'add', value: b[j] }); j++; }
         return ops;
     }
+
+    // ============ 字符级 inline diff（用于修改句子的精细高亮）============
+    /**
+     * 对两个字符串做字符级 LCS，返回左右两侧的 HTML：
+     *   - 左侧：a 中与 b 不匹配的字符包 <span class="cd-del">
+     *   - 右侧：b 中与 a 不匹配的字符包 <span class="cd-ins">
+     * 这样在 VSCode 风格下能看到具体改了哪几个字。
+     * @returns {{leftHtml:string, rightHtml:string}}
+     */
+    function charDiff(a, b) {
+        const A = Array.from(a);   // 支持 Unicode（含中文）按码点切分
+        const B = Array.from(b);
+        const m = A.length, n = B.length;
+        // 性能：超长串降级为整体着色
+        if (m > 400 || n > 400) {
+            return { leftHtml: '<span class="cd-del">' + escapeHtml(a) + '</span>',
+                     rightHtml: '<span class="cd-ins">' + escapeHtml(b) + '</span>' };
+        }
+        const dp = Array.from({ length: m + 1 }, () => new Uint16Array(n + 1));
+        for (let i = m - 1; i >= 0; i--) {
+            for (let j = n - 1; j >= 0; j--) {
+                if (A[i] === B[j]) dp[i][j] = dp[i + 1][j + 1] + 1;
+                else dp[i][j] = Math.max(dp[i + 1][j], dp[i][j + 1]);
+            }
+        }
+        // 回溯：标记 a 中字符是 eq/del，b 中字符是 eq/ins
+        const aMarks = new Array(m).fill('eq');
+        const bMarks = new Array(n).fill('eq');
+        let i = 0, j = 0;
+        while (i < m && j < n) {
+            if (A[i] === B[j]) { i++; j++; }
+            else if (dp[i + 1][j] >= dp[i][j + 1]) { aMarks[i] = 'del'; i++; }
+            else { bMarks[j] = 'ins'; j++; }
+        }
+        while (i < m) { aMarks[i] = 'del'; i++; }
+        while (j < n) { bMarks[j] = 'ins'; j++; }
+
+        // 生成 HTML，合并连续同类标记减少标签数
+        function build(str, marks, cls) {
+            let html = '', cur = null, buf = '';
+            const flush = () => {
+                if (buf === '') return;
+                if (cur === 'eq') html += escapeHtml(buf);
+                else html += '<span class="' + cls + '">' + escapeHtml(buf) + '</span>';
+                buf = '';
+            };
+            for (let k = 0; k < str.length; k++) {
+                if (marks[k] !== cur) { flush(); cur = marks[k]; }
+                buf += str[k];
+            }
+            flush();
+            return html;
+        }
+        return { leftHtml: build(a, aMarks, 'cd-del'), rightHtml: build(b, bMarks, 'cd-ins') };
+    }
+
+    // 为 modify 句子对生成 inline 高亮 HTML
+    // left[i] <-> right[i] 一一对应（多出的挂在末尾）
+    function pairInlineHtml(leftArr, rightArr) {
+        const max = Math.max(leftArr.length, rightArr.length);
+        const leftHtmls = [], rightHtmls = [];
+        for (let k = 0; k < max; k++) {
+            const l = leftArr[k], r = rightArr[k];
+            if (l !== undefined && r !== undefined) {
+                const h = charDiff(l, r);
+                leftHtmls.push(h.leftHtml);
+                rightHtmls.push(h.rightHtml);
+            } else if (l !== undefined) {
+                leftHtmls.push('<span class="cd-del">' + escapeHtml(l) + '</span>');
+            } else {
+                rightHtmls.push('<span class="cd-ins">' + escapeHtml(r) + '</span>');
+            }
+        }
+        return { leftHtmls, rightHtmls };
+    }
+
+    // 旧名兼容
+    function diffLines(a, b) { return diffTokens(a, b); }
 
     /**
      * 将操作序列分组成「对」：equal / modify / add / del
@@ -165,6 +267,7 @@
                 const lRow = makeRow({
                     sign: p.left[r] !== undefined ? leftSign(p) : '',
                     content: p.left[r] !== undefined ? p.left[r] : '',
+                    html: (p.type === 'modify' && p.leftHtmls) ? p.leftHtmls[r] : undefined,
                     no: p.leftNos[r] || '',
                     rowClass: p.left[r] !== undefined ? leftRowClass(p) : 'row-empty',
                     empty: p.left[r] === undefined
@@ -181,6 +284,7 @@
                 const rRow = makeRow({
                     sign: p.right[r] !== undefined ? rightSign(p) : '',
                     content: p.right[r] !== undefined ? p.right[r] : '',
+                    html: (p.type === 'modify' && p.rightHtmls) ? p.rightHtmls[r] : undefined,
                     no: p.rightNos[r] || '',
                     rowClass: p.right[r] !== undefined ? rightRowClass(p) : 'row-empty',
                     empty: p.right[r] === undefined
@@ -226,7 +330,7 @@
         return 'row-equal';
     }
 
-    function makeRow({ sign, content, no, rowClass, empty }) {
+    function makeRow({ sign, content, html, no, rowClass, empty }) {
         const row = document.createElement('div');
         row.className = 'diff-row ' + rowClass;
         const gutter = document.createElement('span');
@@ -237,7 +341,14 @@
         signEl.textContent = sign;
         const contentEl = document.createElement('span');
         contentEl.className = 'line-content';
-        contentEl.innerHTML = empty ? '&nbsp;' : escapeHtml(content);
+        if (empty) {
+            contentEl.innerHTML = '&nbsp;';
+        } else if (html !== undefined) {
+            // 信任预生成的 inline HTML（已转义）
+            contentEl.innerHTML = html;
+        } else {
+            contentEl.textContent = content;
+        }
         row.appendChild(gutter);
         row.appendChild(signEl);
         row.appendChild(contentEl);
@@ -312,6 +423,7 @@
                 const row = makeRow({
                     sign: '-',
                     content: line,
+                    html: (p.type === 'modify' && p.leftHtmls) ? p.leftHtmls[r] : undefined,
                     no: p.leftNos[r] || '',
                     rowClass: leftRowClass(p),
                     empty: false
@@ -322,6 +434,7 @@
                 const row = makeRow({
                     sign: '+',
                     content: line,
+                    html: (p.type === 'modify' && p.rightHtmls) ? p.rightHtmls[r] : undefined,
                     no: p.rightNos[r] || '',
                     rowClass: rightRowClass(p),
                     empty: false
@@ -388,11 +501,20 @@
     function compare() {
         const leftText = leftInput.value;
         const rightText = rightInput.value;
-        const a = splitLines(leftText);
-        const b = splitLines(rightText);
-        const ops = diffLines(a, b);
+        // 用句子级切分做对齐（中文作文友好）
+        const a = splitSentences(leftText);
+        const b = splitSentences(rightText);
+        const ops = diffTokens(a, b);
         pairs = groupOps(ops);
         computeLineNumbers(pairs);
+        // 为 modify 对预计算字符级 inline 高亮 HTML
+        pairs.forEach(p => {
+            if (p.type === 'modify') {
+                const h = pairInlineHtml(p.left, p.right);
+                p.leftHtmls = h.leftHtmls;
+                p.rightHtmls = h.rightHtmls;
+            }
+        });
         renderPc();
         renderMobile();
         renderResult();
@@ -610,27 +732,24 @@
         rightInput.value = tmp;
     });
 
+    // 作文格式预设（含段首全角空格缩进、段落空行）
+    const SAMPLE_LEFT =
+        '　　春天来了，万物复苏。小草从泥土里探出了头，好奇地张望着这个世界。桃花开了，粉红的花瓣在微风中轻轻摇曳。\n' +
+        '　　我和小伙伴们来到郊外踏青。我们在草地上放风筝，风筝飞得很高很高。远处传来小鸟的歌声，清脆悦耳。这是一个美好的下午。';
+
+    const SAMPLE_RIGHT =
+        '　　春天到了，万物复苏。小草从泥土里钻了出来，好奇地打量着这个世界。桃花开了，粉红色的花瓣在微风中轻轻摇曳。\n' +
+        '　　我和小伙伴们来到郊外踏青。我们在草地上放飞风筝，风筝飞得又高又远。远处传来小鸟欢快的歌声，清脆悦耳。真是一个美好的下午！';
+
     loadSampleBtn.addEventListener('click', () => {
-        leftInput.value = [
-            '春风又绿江南岸，',
-            '明月何时照我还。',
-            '这是第一段文本的第二行，',
-            '内容相同，无变化。',
-            '这一行将被删除。',
-            '这一行将被修改成别的内容。',
-            '结尾的相同行。'
-        ].join('\n');
-        rightInput.value = [
-            '春风又绿江南岸，',
-            '明月何时照我还。',
-            '这是第一段文本的第二行，',
-            '内容相同，无变化。',
-            '这一行将被修改成全新的内容。',
-            '这是新增的一行文本。',
-            '结尾的相同行。'
-        ].join('\n');
+        leftInput.value = SAMPLE_LEFT;
+        rightInput.value = SAMPLE_RIGHT;
         compare();
     });
+
+    // 页面载入时预填作文示例，便于直接比对
+    leftInput.value = SAMPLE_LEFT;
+    rightInput.value = SAMPLE_RIGHT;
 
     toggleViewBtn.addEventListener('click', () => {
         document.body.classList.toggle('force-mobile');
@@ -691,4 +810,7 @@
     // 作文排版
     fmtApplyBtn.addEventListener('click', applyFormat);
     fmtCopyBtn.addEventListener('click', copyFormatted);
+
+    // 页面载入后自动比对一次预设作文
+    compare();
 })();
