@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文本比对工具</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app">
+        <header class="app-header">
+            <h1>文本比对工具</h1>
+            <div class="header-actions">
+                <button id="toggleViewBtn" class="btn btn-ghost" title="切换手机/PC视图预览">📱 视图</button>
+                <button id="loadSampleBtn" class="btn btn-ghost">示例</button>
+                <button id="swapBtn" class="btn btn-ghost" title="左右交换">⇄ 交换</button>
+                <button id="clearBtn" class="btn btn-ghost">清空</button>
+            </div>
+        </header>
+
+        <section class="input-section">
+            <div class="input-col">
+                <label class="input-label">左侧文本（原始）</label>
+                <textarea id="leftInput" class="text-input" placeholder="在此粘贴原始文本..."></textarea>
+            </div>
+            <div class="input-col">
+                <label class="input-label">右侧文本（修改）</label>
+                <textarea id="rightInput" class="text-input" placeholder="在此粘贴修改文本..."></textarea>
+            </div>
+        </section>
+
+        <div class="action-bar">
+            <button id="compareBtn" class="btn btn-primary">开始比对</button>
+            <span class="action-hint">支持中英文按行对比，可选择采用左/右/两者</span>
+        </div>
+
+        <section class="diff-section" id="diffSection" hidden>
+            <div class="diff-toolbar">
+                <div class="diff-stats">
+                    <span class="stat stat-add">+<span id="addCount">0</span></span>
+                    <span class="stat stat-del">-<span id="delCount">0</span></span>
+                    <span class="stat stat-mod">~<span id="modCount">0</span></span>
+                </div>
+                <div class="diff-actions">
+                    <button id="acceptAllLeftBtn" class="btn btn-mini">全采用左</button>
+                    <button id="acceptAllRightBtn" class="btn btn-mini">全采用右</button>
+                    <button id="exportBtn" class="btn btn-mini btn-primary">导出结果</button>
+                </div>
+            </div>
+
+            <div class="diff-view-wrap">
+                <div class="diff-view-pc" id="diffViewPc">
+                    <div class="diff-pane diff-pane-left">
+                        <div class="pane-header">左侧</div>
+                        <div class="pane-body" id="leftPaneBody"></div>
+                    </div>
+                    <div class="diff-pane diff-pane-right">
+                        <div class="pane-header">右侧</div>
+                        <div class="pane-body" id="rightPaneBody"></div>
+                    </div>
+                </div>
+
+                <div class="diff-view-mobile" id="diffViewMobile">
+                    <div class="mobile-tabs">
+                        <button class="mobile-tab active" data-side="left">左侧</button>
+                        <button class="mobile-tab" data-side="right">右侧</button>
+                    </div>
+                    <div class="mobile-pane-body" id="mobilePaneBody"></div>
+                </div>
+            </div>
+
+            <details class="result-section">
+                <summary>合并结果（点击展开）</summary>
+                <div class="result-wrap">
+                    <pre id="resultOutput" class="result-output"></pre>
+                    <button id="copyResultBtn" class="btn btn-mini btn-primary">复制</button>
+                </div>
+            </details>
+        </section>
+    </div>
+
+    <div id="toast" class="toast" hidden></div>
+
+    <script src="diff.js"></script>
+</body>
+</html>
